@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV Export Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface2: #1a2236;
+      --border: #1f2d45;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59,130,246,0.25);
+      --accent-hover: #60a5fa;
+      --success: #10b981;
+      --success-glow: rgba(16,185,129,0.25);
+      --error: #ef4444;
+      --error-glow: rgba(239,68,68,0.2);
+      --warning: #f59e0b;
+      --cancel-color: #f97316;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --font: 'Inter', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(59,130,246,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,0.05) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      animation: fadeSlideDown 0.6s ease both;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      color: var(--accent-hover);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .badge-dot {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, var(--accent-hover) 60%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+      margin-bottom: 0.6rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+      animation: fadeSlideUp 0.5s ease both;
+      transition: border-color 0.3s;
+    }
+
+    .card:hover { border-color: rgba(59,130,246,0.3); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.4rem;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #2563eb);
+      color: #fff;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 30px rgba(59,130,246,0.45);
+    }
+    .btn-primary:active:not(:disabled) { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-danger {
+      background: rgba(239,68,68,0.1);
+      color: var(--error);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.2); border-color: var(--error); }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #059669);
+      color: #fff;
+      box-shadow: 0 0 20px var(--success-glow);
+    }
+    .btn-success:hover { transform: translateY(-1px); box-shadow: 0 0 28px rgba(16,185,129,0.4); }
+
+    .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.8rem; }
+
+    /* Active Export Panel */
+    #activeExport { display: none; }
+
+    .export-id-display {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--bg);
+      padding: 0.3rem 0.7rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Status indicator */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-dot.queued { background: var(--text-muted); }
+    .status-dot.processing { background: var(--accent); animation: pulse 1.5s infinite; }
+    .status-dot.completed { background: var(--success); }
+    .status-dot.failed { background: var(--error); }
+    .status-dot.cancelled { background: var(--cancel-color); }
+
+    .status-label {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    /* Progress bar */
+    .progress-wrap {
+      margin-bottom: 1rem;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-bar-bg {
+      height: 10px;
+      background: var(--bg);
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+      box-shadow: 0 0 8px var(--accent-glow);
+      transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+      width: 0%;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+
+    /* Action row */
+    .action-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* WS log */
+    #wsLog {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      line-height: 1.6;
+      max-height: 200px;
+      overflow-y: auto;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      color: var(--text-dim);
+    }
+
+    .log-entry { display: block; }
+    .log-entry.processing { color: var(--accent-hover); }
+    .log-entry.completed { color: var(--success); }
+    .log-entry.failed { color: var(--error); }
+    .log-entry.cancelled { color: var(--cancel-color); }
+    .log-entry.info { color: var(--text-muted); }
+
+    /* History table */
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .history-table th {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-table td {
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid rgba(31,45,69,0.5);
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 0.76rem;
+    }
+
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: var(--surface2); }
+
+    .pill {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .pill.queued { background: rgba(100,116,139,0.2); color: var(--text-muted); }
+    .pill.processing { background: var(--accent-glow); color: var(--accent-hover); }
+    .pill.completed { background: var(--success-glow); color: var(--success); }
+    .pill.failed { background: var(--error-glow); color: var(--error); }
+    .pill.cancelled { background: rgba(249,115,22,0.15); color: var(--cancel-color); }
+
+    /* Ping indicator */
+    .ping-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .ping-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .ping-dot.connected { background: var(--success); box-shadow: 0 0 6px var(--success-glow); }
+    .ping-dot.disconnected { background: var(--error); }
+
+    /* Animations */
+    @keyframes fadeSlideDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    #noHistory { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
+
+    @media (max-width: 600px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="badge"><span class="badge-dot"></span>Real-Time WebSocket Dashboard</div>
+    <h1>CSV Export Dashboard</h1>
+    <p>Stream 100,000 user records with live progress updates</p>
+  </header>
+
+  <!-- Start Export Card -->
+  <div class="card" style="animation-delay:0.1s">
+    <div class="card-header">
+      <span class="card-title">New Export</span>
+      <div class="ping-row">
+        <div class="ping-dot" id="pingDot"></div>
+        <span id="pingLabel">Disconnected</span>
+      </div>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-primary" id="startBtn" onclick="startExport()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Start Export
+      </button>
+      <span style="font-size:0.82rem; color:var(--text-muted);">
+        Exports all 100,000 users to CSV. Progress is streamed in real-time via WebSocket.
+      </span>
+    </div>
+  </div>
+
+  <!-- Active Export Card -->
+  <div class="card" id="activeExport" style="animation-delay:0.15s">
+    <div class="card-header">
+      <span class="card-title">Active Export</span>
+      <span class="export-id-display" id="activeExportId">—</span>
+    </div>
+
+    <div class="status-row">
+      <div class="status-dot queued" id="statusDot"></div>
+      <span class="status-label" id="statusLabel">Queued</span>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-meta">
+        <span id="progressText">0 / 100,000</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Processed</div>
+        <div class="stat-value" id="statProcessed">—</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">ETA</div>
+        <div class="stat-value" id="statEta">—</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">File Size</div>
+        <div class="stat-value" id="statFileSize">—</div>
+      </div>
+    </div>
+
+    <div class="action-row" id="activeActions">
+      <button class="btn btn-danger btn-sm" id="cancelBtn" onclick="cancelExport()" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Cancel
+      </button>
+      <a class="btn btn-success btn-sm" id="downloadBtn" style="display:none" href="#" target="_blank">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- WebSocket Log Card -->
+  <div class="card" id="wsLogCard" style="display:none; animation-delay:0.2s">
+    <div class="card-header">
+      <span class="card-title">WebSocket Messages</span>
+    </div>
+    <div id="wsLog"></div>
+  </div>
+
+  <!-- Export History Card -->
+  <div class="card" style="animation-delay:0.25s">
+    <div class="card-header">
+      <span class="card-title">Export History</span>
+      <button class="btn btn-sm" onclick="loadHistory()" style="background:var(--surface2); color:var(--text-dim); border:1px solid var(--border)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </div>
+    <div id="historyContainer">
+      <p id="noHistory">No exports yet. Start one above!</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  let ws = null;
+  let currentExportId = null;
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  function formatBytes(bytes) {
+    if (!bytes) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  function formatEta(seconds) {
+    if (seconds === null || seconds === undefined) return '—';
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    const m = Math.floor(seconds / 60), s = Math.round(seconds % 60);
+    return `${m}m ${s}s`;
+  }
+
+  function formatNum(n) {
+    return (n ?? 0).toLocaleString();
+  }
+
+  function timeNow() {
+    return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function appendLog(message, type = 'info') {
+    const log = document.getElementById('wsLog');
+    const entry = document.createElement('span');
+    entry.className = `log-entry ${type}`;
+    entry.textContent = `[${timeNow()}] ${message}`;
+    log.appendChild(document.createTextNode('\n'));
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function setStatus(status) {
+    const dot = document.getElementById('statusDot');
+    const label = document.getElementById('statusLabel');
+    dot.className = `status-dot ${status}`;
+    label.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+  }
+
+  function setPing(connected) {
+    const dot = document.getElementById('pingDot');
+    const lbl = document.getElementById('pingLabel');
+    dot.className = 'ping-dot ' + (connected ? 'connected' : 'disconnected');
+    lbl.textContent = connected ? 'Connected' : 'Disconnected';
+  }
+
+  // ── Start Export ───────────────────────────────────────────────────────────
+  async function startExport() {
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Starting…';
+
+    try {
+      const res = await fetch('/api/exports', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { exportId } = await res.json();
+      currentExportId = exportId;
+
+      // Show active panel
+      document.getElementById('activeExport').style.display = 'block';
+      document.getElementById('wsLogCard').style.display = 'block';
+      document.getElementById('activeExportId').textContent = exportId;
+      document.getElementById('cancelBtn').style.display = 'inline-flex';
+      document.getElementById('downloadBtn').style.display = 'none';
+
+      // Reset progress
+      updateProgress(0, 0, 100000, null);
+      document.getElementById('statFileSize').textContent = '—';
+      setStatus('queued');
+
+      document.getElementById('wsLog').textContent = '';
+      appendLog(`Export started: ${exportId}`, 'info');
+
+      connectWebSocket(exportId);
+      setTimeout(loadHistory, 800);
+    } catch (err) {
+      alert('Failed to start export: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Export';
+    }
+  }
+
+  // ── WebSocket ──────────────────────────────────────────────────────────────
+  function connectWebSocket(exportId) {
+    if (ws) { ws.close(); ws = null; }
+
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/ws/exports/${exportId}`);
+
+    ws.onopen = () => {
+      setPing(true);
+      appendLog('WebSocket connected', 'info');
+    };
+
+    ws.onmessage = (event) => {
+      let data;
+      try { data = JSON.parse(event.data); } catch { return; }
+      handleMessage(data);
+    };
+
+    ws.onclose = () => {
+      setPing(false);
+      appendLog('WebSocket disconnected', 'info');
+    };
+
+    ws.onerror = (err) => {
+      appendLog('WebSocket error — check console', 'failed');
+    };
+  }
+
+  function handleMessage(data) {
+    switch (data.status) {
+      case 'processing': {
+        setStatus('processing');
+        const p = data.progress || {};
+        updateProgress(p.percentage || 0, p.processed || 0, p.total || 100000, p.etaSeconds);
+        appendLog(`Progress: ${p.processed?.toLocaleString()}/${p.total?.toLocaleString()} (${p.percentage}%) ETA: ${formatEta(p.etaSeconds)}`, 'processing');
+        break;
+      }
+      case 'completed': {
+        setStatus('completed');
+        updateProgress(100, data.fileSize ? 100000 : 100000, 100000, 0);
+        document.getElementById('statFileSize').textContent = formatBytes(data.fileSize);
+        document.getElementById('statEta').textContent = `${data.durationSeconds}s`;
+        document.getElementById('cancelBtn').style.display = 'none';
+        const dlBtn = document.getElementById('downloadBtn');
+        dlBtn.href = data.downloadUrl;
+        dlBtn.style.display = 'inline-flex';
+        appendLog(`Completed! Size: ${formatBytes(data.fileSize)}, Duration: ${data.durationSeconds}s`, 'completed');
+        setTimeout(loadHistory, 500);
+        break;
+      }
+      case 'failed': {
+        setStatus('failed');
+        document.getElementById('cancelBtn').style.display = 'none';
+        appendLog(`Failed: ${data.error}`, 'failed');
+        setTimeout(loadHistory, 500);
+        break;
+      }
+      case 'cancelled': {
+        setStatus('cancelled');
+        document.getElementById('cancelBtn').style.display = 'none';
+        appendLog('Export cancelled.', 'cancelled');
+        setTimeout(loadHistory, 500);
+        break;
+      }
+      default:
+        if (data.type === 'pong') appendLog('Pong received ✓', 'info');
+    }
+  }
+
+  function updateProgress(pct, processed, total, etaSeconds) {
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressText').textContent = `${formatNum(processed)} / ${formatNum(total)}`;
+    document.getElementById('statProcessed').textContent = formatNum(processed);
+    document.getElementById('statEta').textContent = formatEta(etaSeconds);
+  }
+
+  // ── Cancel ─────────────────────────────────────────────────────────────────
+  function cancelExport() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action: 'cancel' }));
+      appendLog('Cancel request sent…', 'cancelled');
+    }
+  }
+
+  // ── History ────────────────────────────────────────────────────────────────
+  async function loadHistory() {
+    try {
+      const res = await fetch('/api/exports');
+      if (!res.ok) return;
+      const { exports } = await res.json();
+      renderHistory(exports);
+    } catch {}
+  }
+
+  function renderHistory(exports) {
+    const container = document.getElementById('historyContainer');
+    if (!exports || exports.length === 0) {
+      container.innerHTML = '<p id="noHistory">No exports yet. Start one above!</p>';
+      return;
+    }
+
+    const rows = exports.map(e => {
+      const created = new Date(e.createdAt).toLocaleString();
+      const completed = e.completedAt ? new Date(e.completedAt).toLocaleString() : '—';
+      const isCompleted = e.status === 'completed';
+      return `
+        <tr>
+          <td title="${e.exportId}">${e.exportId.slice(0, 8)}…</td>
+          <td><span class="pill ${e.status}">${e.status}</span></td>
+          <td>${created}</td>
+          <td>${completed}</td>
+          <td>
+            ${isCompleted
+              ? `<a class="btn btn-success btn-sm" href="/api/exports/${e.exportId}/download" target="_blank" style="text-decoration:none">↓ CSV</a>`
+              : '—'
+            }
+          </td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Export ID</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Completed</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // Load history on page load
+  loadHistory();
+</script>
+</body>
+</html>
