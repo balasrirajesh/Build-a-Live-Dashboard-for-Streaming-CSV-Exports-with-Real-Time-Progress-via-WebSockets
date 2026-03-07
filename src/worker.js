@@ -13,20 +13,20 @@ if (!fs.existsSync(EXPORTS_DIR)) fs.mkdirSync(EXPORTS_DIR, { recursive: true });
 async function updateExportStatus(exportId, fields) {
     const keys = Object.keys(fields);
     const vals = Object.values(fields);
-    const set  = keys.map((k, i) => ${k} = {i + 1}).join(', ');
-    await db.query(UPDATE exports SET  WHERE id = {keys.length + 1}, [...vals, exportId]);
+    const set  = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+    await db.query(`UPDATE exports SET ${set} WHERE id = $${keys.length + 1}`, [...vals, exportId]);
 }
 
 exportQueue.process(async (job) => {
     const { exportId } = job.data;
-    const filePath = path.join(EXPORTS_DIR, export-.csv);
+    const filePath = path.join(EXPORTS_DIR, `${exportId}.csv`);
     const writeStream = fs.createWriteStream(filePath);
     const csvStream   = format({ headers: true });
     csvStream.pipe(writeStream);
 
     for (let offset = 0; offset < TOTAL_USERS; offset += BATCH_SIZE) {
         const result = await db.query(
-            'SELECT id, name, email, created_at FROM users ORDER BY id LIMIT  OFFSET ',
+            'SELECT id, name, email, created_at FROM users ORDER BY id LIMIT $1 OFFSET $2',
             [BATCH_SIZE, offset]
         );
         for (const row of result.rows) csvStream.write(row);
@@ -37,7 +37,7 @@ exportQueue.process(async (job) => {
         writeStream.on('finish', resolve);
         writeStream.on('error', reject);
     });
-    console.log([worker] Export  done);
+    console.log('[worker] Export done');
 });
 
 console.log('[worker] listening for jobs...');
