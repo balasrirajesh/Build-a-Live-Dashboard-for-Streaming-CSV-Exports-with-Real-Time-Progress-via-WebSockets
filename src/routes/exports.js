@@ -8,7 +8,7 @@ const { addExportJob } = require('../queue');
 router.post('/', async (req, res) => {
     const exportId = uuidv4();
     await db.query(
-        INSERT INTO exports (id, status, created_at) VALUES (, 'queued', NOW()),
+        'INSERT INTO exports (id, status, created_at) VALUES ($1, \'queued\', NOW())',
         [exportId]
     );
     await addExportJob(exportId);
@@ -18,8 +18,7 @@ router.post('/', async (req, res) => {
 // GET /api/exports
 router.get('/', async (req, res) => {
     const result = await db.query(
-        SELECT id AS "exportId", status, created_at AS "createdAt", completed_at AS "completedAt"
-         FROM exports ORDER BY created_at DESC LIMIT 50
+        'SELECT id AS "exportId", status, created_at AS "createdAt", completed_at AS "completedAt" FROM exports ORDER BY created_at DESC LIMIT 50'
     );
     res.status(200).json({ exports: result.rows });
 });
