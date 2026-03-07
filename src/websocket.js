@@ -20,7 +20,7 @@ function setupWebSocket(server) {
         const match = url.parse(req.url).pathname.match(/^\/ws\/exports\/([^/]+)$/);
         if (!match) { ws.close(1003, 'Invalid path'); return; }
         const exportId = match[1];
-        const channel  = export:;
+        const channel  = `export:${exportId}`;
         if (!clients.has(exportId)) clients.set(exportId, new Set());
         clients.get(exportId).add(ws);
         if (!subscribedChannels.has(channel)) { subscriber.subscribe(channel); subscribedChannels.add(channel); }
