@@ -1,197 +1,210 @@
-﻿# ðŸ“Š Live CSV Export Dashboard
+﻿# Live CSV Export Dashboard
 
-> **A full-stack service that exports large datasets to CSV files with real-time WebSocket progress tracking, built with Node.js, PostgreSQL, Redis, and Docker.**
+A full-stack service that exports large datasets to CSV with **real-time progress updates** streamed to the browser via WebSockets.
 
-![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=flat-square&logo=node.js&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
-![WebSocket](https://img.shields.io/badge/WebSocket-Real--Time-010101?style=flat-square&logo=websocket)
+Built with **Node.js**, **PostgreSQL**, **Redis (Bull + Pub/Sub)**, and **Docker**.
 
 ---
 
-## âœ¨ Features
+## Table of Contents
 
-- **ðŸš€ Async Job Processing** â€” Export jobs are queued with [Bull](https://github.com/OptimalBits/bull) and processed in the background without blocking the API
-- **ðŸ“¡ Real-Time Progress** â€” Live per-job progress updates streamed to the browser via WebSockets (progress %, ETA, rows processed)
-- **âŒ Cancellation Support** â€” Cancel any in-progress export at any time from the dashboard or via the WebSocket channel
-- **ðŸ“¥ CSV Download** â€” Download completed exports directly through a streaming HTTP endpoint
-- **ðŸ’“ Heartbeat Mechanism** â€” WebSocket connections are kept alive with periodic ping/pong frames
-- **ðŸ³ Fully Dockerized** â€” Single `docker compose up` command brings the full stack online
-- **ðŸŒ± Auto-seeded Database** â€” PostgreSQL is pre-seeded with 100,000 synthetic user records on first run
-
----
-
-## ðŸ—ï¸ Architecture
-
-```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚                          Browser / Client                           â”‚
-â”‚                                                                     â”‚
-â”‚   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚   â”‚                     Dashboard (index.html)                   â”‚  â”‚
-â”‚   â”‚  - POST /api/exports        â†’ Start export                   â”‚  â”‚
-â”‚   â”‚  - GET  /api/exports        â†’ List recent exports            â”‚  â”‚
-â”‚   â”‚  - WS   /ws/exports/{id}    â†’ Receive live progress updates  â”‚  â”‚
-â”‚   â”‚  - GET  /api/exports/{id}/download  â†’ Download CSV           â”‚  â”‚
-â”‚   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                           â”‚ HTTP / WS             â”‚
-                           â–¼                       â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚                     Node.js Application (Port 8080)                  â”‚
-â”‚                                                                      â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”‚
-â”‚  â”‚   Express API   â”‚   â”‚  WebSocket Srv  â”‚   â”‚   Bull Worker    â”‚   â”‚
-â”‚  â”‚   server.js     â”‚   â”‚  websocket.js   â”‚   â”‚   worker.js      â”‚   â”‚
-â”‚  â”‚                 â”‚   â”‚                 â”‚   â”‚                  â”‚   â”‚
-â”‚  â”‚ POST /exports   â”‚   â”‚ Path:           â”‚   â”‚ - Reads DB in    â”‚   â”‚
-â”‚  â”‚ GET  /exports   â”‚   â”‚ /ws/exports/    â”‚   â”‚   batches of     â”‚   â”‚
-â”‚  â”‚ GET  /download  â”‚â”€â”€â–¶â”‚ {exportId}      â”‚   â”‚   1,000 rows     â”‚   â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚                 â”‚   â”‚ - Writes CSV     â”‚   â”‚
-â”‚           â”‚            â”‚ Subscribes to   â”‚   â”‚   to /tmp/       â”‚   â”‚
-â”‚           â”‚ enqueue    â”‚ Redis channel   â”‚   â”‚ - Publishes      â”‚   â”‚
-â”‚           â–¼            â”‚ per exportId    â”‚   â”‚   progress to    â”‚   â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚   Redis Pub/Sub  â”‚   â”‚
-â”‚  â”‚   Bull Queue    â”‚            â”‚             â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â”‚
-â”‚  â”‚   queue.js      â”‚            â”‚                      â”‚             â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜            â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜             â”‚
-â”‚                                          Redis Pub/Sub              â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-               â”‚                                  â”‚
-               â–¼                                  â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”              â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚  PostgreSQL :5432   â”‚              â”‚          Redis :6379            â”‚
-â”‚                     â”‚              â”‚                                 â”‚
-â”‚  exports table      â”‚              â”‚  Bull Queue: "csv-exports"      â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚              â”‚  Pub/Sub: "export:{id}"         â”‚
-â”‚  â”‚ id (UUID)     â”‚  â”‚              â”‚  Cancel Flag: "cancel:{id}"     â”‚
-â”‚  â”‚ status        â”‚  â”‚              â”‚                                 â”‚
-â”‚  â”‚ created_at    â”‚  â”‚              â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-â”‚  â”‚ completed_at  â”‚  â”‚
-â”‚  â”‚ file_path     â”‚  â”‚
-â”‚  â”‚ file_size     â”‚  â”‚
-â”‚  â”‚ duration_secs â”‚  â”‚
-â”‚  â”‚ error_message â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â”‚                     â”‚
-â”‚  users table        â”‚
-â”‚  (100,000 rows)     â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-```
-
-### Data Flow
-
-```
-Client                  API              Bull Queue          Worker           Redis Pub/Sub       WebSocket
-  â”‚                      â”‚                   â”‚                 â”‚                   â”‚                  â”‚
-  â”‚â”€â”€â”€ POST /exports â”€â”€â”€â–¶â”‚                   â”‚                 â”‚                   â”‚                  â”‚
-  â”‚                      â”‚â”€â”€ addJob â”€â”€â”€â”€â”€â”€â”€â”€â–¶â”‚                 â”‚                   â”‚                  â”‚
-  â”‚â—€â”€â”€ 202 {exportId} â”€â”€â”€â”‚                   â”‚                 â”‚                   â”‚                  â”‚
-  â”‚                      â”‚                   â”‚â”€â”€ processJob â”€â”€â–¶â”‚                   â”‚                  â”‚
-  â”‚â”€â”€â”€ WS connect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¶â”‚
-  â”‚                      â”‚                   â”‚                 â”‚â”€â”€ publish â”€â”€â”€â”€â”€â”€â”€â–¶â”‚                  â”‚
-  â”‚                      â”‚                   â”‚                 â”‚   (progress)      â”‚â”€â”€ forward msg â”€â”€â–¶â”‚
-  â”‚â—€â”€ {status, progress%} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â”‚
-  â”‚                      â”‚                   â”‚                 â”‚â”€â”€ publish â”€â”€â”€â”€â”€â”€â”€â–¶â”‚                  â”‚
-  â”‚                      â”‚                   â”‚                 â”‚   (completed)     â”‚â”€â”€ forward msg â”€â”€â–¶â”‚
-  â”‚â—€â”€ {status:completed, downloadUrl} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â”‚
-  â”‚â”€â”€â”€ GET /download â”€â”€â”€â–¶â”‚                   â”‚                 â”‚                   â”‚                  â”‚
-  â”‚â—€â”€â”€ CSV stream â”€â”€â”€â”€â”€â”€â”€â”‚                   â”‚                 â”‚                   â”‚                  â”‚
-```
+1. [Features](#features)
+2. [Tech Stack](#tech-stack)
+3. [Architecture](#architecture)
+4. [Project Structure](#project-structure)
+5. [Getting Started](#getting-started)
+6. [Environment Variables](#environment-variables)
+7. [API Reference](#api-reference)
+8. [WebSocket API](#websocket-api)
+9. [Database Schema](#database-schema)
+10. [How It Works](#how-it-works)
+11. [Manual Testing](#manual-testing)
+12. [Docker Services](#docker-services)
+13. [License](#license)
 
 ---
 
-## ðŸ—‚ï¸ Project Structure
+## Features
+
+- **Async Job Processing** — Export jobs are queued with [Bull](https://github.com/OptimalBits/bull) and processed in the background without blocking the API.
+- **Real-Time Progress** — Live per-job progress updates streamed to the browser via WebSockets, including percentage, rows processed, and estimated time remaining.
+- **Cancellation Support** — Cancel any in-progress export at any time from the dashboard or directly through the WebSocket channel.
+- **CSV Download** — Download completed exports through a streaming HTTP endpoint with no memory buffering.
+- **Heartbeat Mechanism** — WebSocket connections are kept alive with periodic server-side ping/pong frames every 30 seconds.
+- **Fully Dockerized** — A single `docker compose up --build` command starts the entire stack.
+- **Auto-seeded Database** — PostgreSQL is pre-seeded with 100,000 synthetic user records on first startup.
+
+---
+
+## Tech Stack
+
+| Layer           | Technology       | Purpose                                        |
+|-----------------|------------------|------------------------------------------------|
+| Runtime         | Node.js 20       | JavaScript server runtime                      |
+| API Framework   | Express.js 4     | HTTP REST API                                  |
+| WebSocket       | ws               | Real-time bidirectional communication          |
+| Job Queue       | Bull 4           | Background job processing backed by Redis      |
+| Database        | PostgreSQL 16    | Persistent export metadata and user data       |
+| Cache / Pub-Sub | Redis 7          | Job queue storage and real-time event channel  |
+| CSV Generation  | fast-csv         | Memory-efficient streaming CSV writer          |
+| Containers      | Docker Compose   | Service orchestration                          |
+
+---
+
+## Architecture
+
+```
++------------------------------------------------------------------+
+|                         Browser (Client)                         |
+|                                                                  |
+|   POST /api/exports          --> Start a new export              |
+|   GET  /api/exports          --> List recent exports             |
+|   WS   /ws/exports/{id}      --> Receive live progress updates   |
+|   GET  /api/exports/{id}/download --> Download completed CSV     |
++---------------------------+------------------+-------------------+
+                            | HTTP             | WebSocket
+                            v                  v
++------------------------------------------------------------------+
+|                  Node.js Application  (Port 8080)                |
+|                                                                  |
+|  +----------------+   +------------------+   +---------------+  |
+|  |  Express API   |   |  WebSocket Srv   |   |  Bull Worker  |  |
+|  |  server.js     |   |  websocket.js    |   |  worker.js    |  |
+|  |                |   |                  |   |               |  |
+|  | POST /exports  |   | /ws/exports/{id} |   | Reads DB in   |  |
+|  | GET  /exports  |   |                  |   | batches of    |  |
+|  | GET  /download |   | Subscribes to    |   | 1,000 rows    |  |
+|  +-------+--------+   | Redis channel    |   |               |  |
+|          |            | per export ID    |   | Writes CSV to |  |
+|          | enqueue    +--------+---------+   | /tmp/exports/ |  |
+|          v                     |             |               |  |
+|  +----------------+            |             | Publishes     |  |
+|  |   Bull Queue   |            |             | progress to   |  |
+|  |   queue.js     |            |             | Redis Pub/Sub |  |
+|  +----------------+            +-------------+---------------+  |
+|                                     Redis Pub/Sub               |
++-----------------------------+------------------+----------------+
+                              |                  |
+                              v                  v
+              +---------------+--+   +-----------+------------+
+              |  PostgreSQL :5432 |   |       Redis :6379      |
+              |                  |   |                        |
+              |  exports table   |   |  Bull Queue            |
+              |  users table     |   |  Pub/Sub channels      |
+              |  (100,000 rows)  |   |  Cancel flags          |
+              +------------------+   +------------------------+
+```
+
+### Request and Event Flow
+
+```
+Client          API Server        Bull Queue       Worker        Redis        WebSocket
+  |                |                  |              |              |              |
+  |-- POST /exports-->                |              |              |              |
+  |                |-- add job ------>|              |              |              |
+  |<-- 202 { exportId } -------------|              |              |              |
+  |                |                  |-- process -->|              |              |
+  |-- WS connect ---------------------------------------------------------------->|
+  |                |                  |              |-- publish -->|              |
+  |                |                  |              |  (progress)  |-- forward -->|
+  |<-- { status, progress% } ----------------------------------------------- -----|
+  |                |                  |              |-- publish -->|              |
+  |                |                  |              | (completed)  |-- forward -->|
+  |<-- { status: completed, downloadUrl } --------------------------------------- -|
+  |-- GET /download -->               |              |              |              |
+  |<-- CSV stream -----|              |              |              |              |
+```
+
+---
+
+## Project Structure
 
 ```
 .
-â”œâ”€â”€ docker-compose.yml          # Orchestrates app, PostgreSQL, and Redis
-â”œâ”€â”€ Dockerfile                  # Multi-stage Node.js 20 Alpine image
-â”œâ”€â”€ package.json
-â”œâ”€â”€ .env.example                # Environment variable template
-â”‚
-â”œâ”€â”€ public/
-â”‚   â””â”€â”€ index.html              # Single-page dashboard UI
-â”‚
-â”œâ”€â”€ seeds/
-â”‚   â””â”€â”€ init.sql                # DB schema + 100k user seed data
-â”‚
-â””â”€â”€ src/
-    â”œâ”€â”€ server.js               # Express app + HTTP server bootstrap
-    â”œâ”€â”€ queue.js                # Bull queue configuration
-    â”œâ”€â”€ redis.js                # ioredis publisher + subscriber clients
-    â”œâ”€â”€ db.js                   # pg Pool connection
-    â”œâ”€â”€ websocket.js            # WebSocket server + Redis Pub/Sub bridge
-    â”œâ”€â”€ worker.js               # CSV export job processor
-    â””â”€â”€ routes/
-        â””â”€â”€ exports.js          # REST API route handlers
+├── docker-compose.yml       # Orchestrates app, PostgreSQL, and Redis
+├── Dockerfile               # Node.js 20 Alpine image
+├── package.json
+├── .env.example             # Environment variable template
+│
+├── public/
+│   └── index.html           # Single-page dashboard UI
+│
+├── seeds/
+│   └── init.sql             # Creates tables and seeds 100k users
+│
+└── src/
+    ├── server.js            # Express app entry point
+    ├── db.js                # PostgreSQL pool connection
+    ├── redis.js             # ioredis publisher and subscriber
+    ├── queue.js             # Bull queue configuration
+    ├── websocket.js         # WebSocket server + Redis Pub/Sub bridge
+    ├── worker.js            # CSV export job processor
+    └── routes/
+        └── exports.js       # REST API route handlers
 ```
 
 ---
 
-## âš™ï¸ Tech Stack
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| **Runtime** | Node.js 20 | JavaScript server runtime |
-| **API Framework** | Express.js 4 | HTTP REST API |
-| **WebSocket** | `ws` library | Real-time bidirectional communication |
-| **Job Queue** | Bull 4 | Background job processing and retry logic |
-| **Database** | PostgreSQL 16 | Persistent export job metadata and user data |
-| **Cache / Pub-Sub** | Redis 7 | Job queue backend + real-time progress events |
-| **CSV Generation** | fast-csv | Streaming CSV writing for memory efficiency |
-| **Containerization** | Docker Compose | Service orchestration |
-
----
-
-## ðŸš€ Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- [Docker](https://www.docker.com/get-started) & Docker Compose
-- (Optional) Node.js 20+ for local development
+- [Docker](https://www.docker.com/get-started) and Docker Compose v2+
+- Node.js 20+ (optional, only needed for local development without Docker)
 
-### 1. Clone the repository
+### Step 1 — Clone the repository
 
 ```bash
-git clone <repository-url>
-cd "Build a Live Dashboard for Streaming CSV Exports with Real-Time Progress via WebSockets"
+git clone https://github.com/balasrirajesh/Build-a-Live-Dashboard-for-Streaming-CSV-Exports-with-Real-Time-Progress-via-WebSockets.git
+cd Build-a-Live-Dashboard-for-Streaming-CSV-Exports-with-Real-Time-Progress-via-WebSockets
 ```
 
-### 2. Configure environment variables
+### Step 2 — Configure environment variables
 
 ```bash
 cp .env.example .env
-# Edit .env if you need to override defaults
+# The defaults work out of the box with Docker Compose.
+# Edit .env only if you need to use custom credentials.
 ```
 
-### 3. Start all services
+### Step 3 — Start all services
 
 ```bash
 docker compose up --build
 ```
 
-This command will:
-1. Build the Node.js application image
-2. Start PostgreSQL and wait for it to be healthy
-3. Auto-run `seeds/init.sql` to create the schema and seed 100,000 users
+This will:
+
+1. Build the Node.js application Docker image
+2. Start PostgreSQL and wait for it to pass its health check
+3. Automatically run `seeds/init.sql` to create tables and seed 100,000 users
 4. Start Redis
-5. Start the application on **http://localhost:8080**
+5. Start the application on port **8080**
 
-### 4. Open the Dashboard
+### Step 4 — Open the dashboard
 
-Navigate to **[http://localhost:8080](http://localhost:8080)** in your browser.
+Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
 ---
 
-## ðŸ“¡ API Reference
+## Environment Variables
 
-### `POST /api/exports`
+| Variable       | Default                                          | Description                    |
+|----------------|--------------------------------------------------|--------------------------------|
+| `PORT`         | `8080`                                           | HTTP server listening port     |
+| `DATABASE_URL` | `postgres://postgres:postgres@db:5432/exports_db`| PostgreSQL connection string   |
+| `REDIS_URL`    | `redis://redis:6379`                             | Redis connection string        |
 
-Initiate a new CSV export job.
+---
 
-**Response** `202 Accepted`
+## API Reference
+
+### POST /api/exports
+
+Start a new CSV export job. The job is queued immediately and processed in the background.
+
+**Response — 202 Accepted**
+
 ```json
 {
   "exportId": "3f6e4567-e89b-12d3-a456-426614174000"
@@ -200,11 +213,12 @@ Initiate a new CSV export job.
 
 ---
 
-### `GET /api/exports`
+### GET /api/exports
 
-List the 50 most recent export jobs.
+List the 50 most recently created export jobs.
 
-**Response** `200 OK`
+**Response — 200 OK**
+
 ```json
 {
   "exports": [
@@ -220,38 +234,43 @@ List the 50 most recent export jobs.
 
 ---
 
-### `GET /api/exports/:exportId/download`
+### GET /api/exports/:exportId/download
 
-Stream and download a completed CSV file.
+Download a completed export as a CSV file. The file is streamed directly from disk.
 
-| Status | Meaning |
-|--------|---------|
-| `200` | CSV file bytes, `Content-Type: text/csv` |
-| `404` | Export not found or file missing from disk |
-| `409` | Export is not yet in `completed` state |
+| Response Code | Meaning                                          |
+|---------------|--------------------------------------------------|
+| `200`         | CSV file bytes (`Content-Type: text/csv`)        |
+| `404`         | Export not found, or CSV file missing from disk  |
+| `409`         | Export exists but is not yet in `completed` state|
 
 ---
 
-### `GET /health`
+### GET /health
 
-Health check endpoint for Docker and load balancers.
+Health check used by Docker and load balancers.
 
-**Response** `200 OK`
+**Response — 200 OK**
+
 ```json
-{ "status": "ok", "timestamp": "2024-01-15T10:30:00.000Z" }
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
 ```
 
 ---
 
-## ðŸ”Œ WebSocket API
+## WebSocket API
 
-Connect to a per-export WebSocket channel to receive live status and progress events.
+Connect to a per-export channel to receive live status and progress events.
 
 **Endpoint:** `ws://localhost:8080/ws/exports/{exportId}`
 
-### Server â†’ Client Messages
+### Messages from Server to Client
 
-#### Progress Update
+#### Progress update (sent every ~500 ms during processing)
+
 ```json
 {
   "exportId": "3f6e4567-...",
@@ -266,7 +285,8 @@ Connect to a per-export WebSocket channel to receive live status and progress ev
 }
 ```
 
-#### Completed
+#### Export completed
+
 ```json
 {
   "exportId": "3f6e4567-...",
@@ -277,7 +297,8 @@ Connect to a per-export WebSocket channel to receive live status and progress ev
 }
 ```
 
-#### Failed
+#### Export failed
+
 ```json
 {
   "exportId": "3f6e4567-...",
@@ -287,7 +308,8 @@ Connect to a per-export WebSocket channel to receive live status and progress ev
 }
 ```
 
-#### Cancelled
+#### Export cancelled
+
 ```json
 {
   "exportId": "3f6e4567-...",
@@ -296,316 +318,124 @@ Connect to a per-export WebSocket channel to receive live status and progress ev
 }
 ```
 
-### Client â†’ Server Messages
+### Messages from Client to Server
 
-#### Cancel an Export
+#### Cancel an in-progress export
+
 ```json
 { "action": "cancel" }
 ```
 
-#### Ping / Keepalive
+#### Application-level ping / keepalive
+
 ```json
 { "type": "ping" }
 ```
-Server responds with `{ "type": "pong", "timestamp": "..." }`.
 
----
+The server responds with:
 
-## ðŸ—„ï¸ Database Schema
-
-### `exports` table
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `VARCHAR(36)` | UUID export identifier (Primary Key) |
-| `status` | `VARCHAR(20)` | `queued` \| `processing` \| `completed` \| `failed` \| `cancelled` |
-| `created_at` | `TIMESTAMP` | Job creation time |
-| `completed_at` | `TIMESTAMP` | Job completion time (nullable) |
-| `file_path` | `TEXT` | Absolute path to generated CSV (nullable) |
-| `file_size` | `BIGINT` | File size in bytes (nullable) |
-| `duration_seconds` | `NUMERIC(10,2)` | Processing duration (nullable) |
-| `error_message` | `TEXT` | Error details on failure (nullable) |
-
-### `users` table
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `SERIAL` | Auto-incrementing user ID (Primary Key) |
-| `name` | `VARCHAR(255)` | User's display name |
-| `email` | `VARCHAR(255)` | Unique email address |
-| `created_at` | `TIMESTAMP` | Account creation timestamp |
-
----
-
-## ðŸ”§ Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | HTTP server listening port |
-| `DATABASE_URL` | `postgres://postgres:postgres@db:5432/exports_db` | PostgreSQL connection string |
-| `REDIS_URL` | `redis://redis:6379` | Redis connection string |
-
----
-
-## ðŸ—ï¸ How It Works â€” Deep Dive
-
-### Export Job Lifecycle
-
-```
-queued â†’ processing â†’ completed
-                    â†˜ failed
-                    â†˜ cancelled
+```json
+{ "type": "pong", "timestamp": "2024-01-15T10:30:20.000Z" }
 ```
 
-1. **Client** sends `POST /api/exports` â†’ API creates a record in PostgreSQL with status `queued` and enqueues a Bull job.
-2. **Bull Worker** picks up the job, updates the DB to `processing`, and begins reading users in batches of 1,000 rows.
-3. **Progress** is published to a Redis Pub/Sub channel (`export:{exportId}`) at most every 500ms with ETA and percentage.
-4. **WebSocket Server** subscribes to the Redis channel on client connection and forwards all messages to connected browsers.
-5. **On completion**, the CSV file is saved to `/tmp/exports/`, DB is updated to `completed`, and a final WebSocket message with the `downloadUrl` is sent.
-6. **On cancellation**, the client sends `{ action: "cancel" }` via WebSocket. The server sets a Redis flag (`cancel:{exportId}`) that the worker checks before each batch, enabling graceful mid-export cancellation.
+---
 
-### Redis Usage
+## Database Schema
 
-| Key pattern | Type | Purpose |
-|-------------|------|---------|
-| `bull:csv-exports:*` | Hash/List | Bull job queue internals |
-| `export:{exportId}` | Pub/Sub channel | Real-time progress broadcasting |
-| `cancel:{exportId}` | String (`"1"`) | Cancellation signal flag (TTL: 1 hour) |
+### exports table
+
+Tracks the lifecycle of every export job.
+
+| Column            | Type           | Description                                              |
+|-------------------|----------------|----------------------------------------------------------|
+| `id`              | VARCHAR(36)    | UUID — primary key                                       |
+| `status`          | VARCHAR(20)    | `queued`, `processing`, `completed`, `failed`, `cancelled` |
+| `created_at`      | TIMESTAMP      | Job creation time                                        |
+| `completed_at`    | TIMESTAMP      | Completion time (null until done)                        |
+| `file_path`       | TEXT           | Absolute path to the generated CSV on disk               |
+| `file_size`       | BIGINT         | File size in bytes                                       |
+| `duration_seconds`| NUMERIC(10,2)  | Total processing time in seconds                         |
+| `error_message`   | TEXT           | Error details if the job failed                          |
+
+### users table
+
+Source data for CSV exports. Pre-seeded with 100,000 rows.
+
+| Column       | Type         | Description                  |
+|--------------|--------------|------------------------------|
+| `id`         | SERIAL       | Auto-incrementing primary key |
+| `name`       | VARCHAR(255) | User display name             |
+| `email`      | VARCHAR(255) | Unique email address          |
+| `created_at` | TIMESTAMP    | Account creation timestamp    |
 
 ---
 
-## ðŸ§ª Manual Testing
+## How It Works
 
-### Using curl
+### Export job lifecycle
+
+```
+queued  -->  processing  -->  completed
+                         \->  failed
+                         \->  cancelled
+```
+
+1. The client sends `POST /api/exports`. The API inserts a row with `status = queued` into PostgreSQL, then adds a Bull job to Redis.
+2. The Bull worker picks up the job, sets `status = processing`, and starts reading users from PostgreSQL in batches of 1,000 rows at a time.
+3. After each batch, the worker publishes a progress event to a Redis Pub/Sub channel named `export:{exportId}`. Events include percentage complete and estimated time remaining, throttled to at most one per 500 ms.
+4. The WebSocket server subscribes to that Redis channel when a browser client connects, and forwards every message directly to the connected client.
+5. When all rows are written, the CSV is finalized on disk, the DB row is updated to `completed`, and a final WebSocket message is sent with the download URL.
+6. To cancel, the browser sends `{ "action": "cancel" }` over the WebSocket. The server writes a `cancel:{exportId}` flag to Redis. The worker checks this flag before processing each batch and stops gracefully, deleting the partial file and setting `status = cancelled`.
+
+### Redis key reference
+
+| Key                  | Type        | Purpose                                           |
+|----------------------|-------------|---------------------------------------------------|
+| `bull:csv-exports:*` | Hash / List | Internal Bull queue data                          |
+| `export:{exportId}`  | Pub/Sub     | Real-time progress and status events              |
+| `cancel:{exportId}`  | String      | Cancellation flag (`"1"`), expires after 1 hour  |
+
+---
+
+## Manual Testing
+
+### With curl (bash / WSL)
 
 ```bash
-# 1. Start an export
+# Start a new export
 EXPORT_ID=$(curl -s -X POST http://localhost:8080/api/exports | jq -r '.exportId')
 echo "Export ID: $EXPORT_ID"
 
-# 2. List all exports
+# Check the job list
 curl -s http://localhost:8080/api/exports | jq
 
-# 3. Download (after completion)
+# Download the file after completion
 curl -O -J "http://localhost:8080/api/exports/$EXPORT_ID/download"
 ```
 
-### WebSocket Testing (wscat)
+### WebSocket with wscat
 
 ```bash
 npx wscat -c ws://localhost:8080/ws/exports/$EXPORT_ID
 
-# Cancel from WebSocket REPL:
+# To cancel, type in the wscat REPL:
 > {"action":"cancel"}
 ```
 
 ---
 
-## ðŸ³ Docker Services
+## Docker Services
 
-| Service | Image | Port | Role |
-|---------|-------|------|------|
-| `app` | `node:20-alpine` (custom) | `8080` | Node.js API + Worker + WebSocket |
-| `db` | `postgres:16-alpine` | â€” (internal) | Persistent data store |
-| `redis` | `redis:7-alpine` | â€” (internal) | Job queue + Pub/Sub |
+| Service | Image                  | Port          | Role                              |
+|---------|------------------------|---------------|-----------------------------------|
+| `app`   | node:20-alpine (custom)| 8080 (public) | Express API + Worker + WebSocket  |
+| `db`    | postgres:16-alpine     | internal only | Persistent data store             |
+| `redis` | redis:7-alpine         | internal only | Job queue and Pub/Sub broker      |
 
-All services include health checks. The `app` container waits for both `db` and `redis` to be healthy before starting.
-}
-  ]
-}
-```
+All three services have health checks configured. The `app` container is blocked from starting until both `db` and `redis` pass their health checks.
 
 ---
 
-### `GET /api/exports/:exportId/download`
-
-Stream and download a completed CSV file.
-
-| Status | Meaning |
-|--------|---------|
-| `200` | CSV file bytes, `Content-Type: text/csv` |
-| `404` | Export not found or file missing from disk |
-| `409` | Export is not yet in `completed` state |
-
----
-
-### `GET /health`
-
-Health check endpoint for Docker and load balancers.
-
-**Response** `200 OK`
-```json
-{ "status": "ok", "timestamp": "2024-01-15T10:30:00.000Z" }
-```
-
----
-
-## ðŸ”Œ WebSocket API
-
-Connect to a per-export WebSocket channel to receive live status and progress events.
-
-**Endpoint:** `ws://localhost:8080/ws/exports/{exportId}`
-
-### Server â†’ Client Messages
-
-#### Progress Update
-```json
-{
-  "exportId": "3f6e4567-...",
-  "status": "processing",
-  "progress": {
-    "total": 100000,
-    "processed": 45000,
-    "percentage": 45,
-    "etaSeconds": 12
-  },
-  "timestamp": "2024-01-15T10:30:20.000Z"
-}
-```
-
-#### Completed
-```json
-{
-  "exportId": "3f6e4567-...",
-  "status": "completed",
-  "downloadUrl": "/api/exports/3f6e4567-.../download",
-  "fileSize": 8388608,
-  "durationSeconds": 42.35
-}
-```
-
-#### Failed
-```json
-{
-  "exportId": "3f6e4567-...",
-  "status": "failed",
-  "error": "Database connection lost",
-  "timestamp": "2024-01-15T10:30:20.000Z"
-}
-```
-
-#### Cancelled
-```json
-{
-  "exportId": "3f6e4567-...",
-  "status": "cancelled",
-  "timestamp": "2024-01-15T10:30:20.000Z"
-}
-```
-
-### Client â†’ Server Messages
-
-#### Cancel an Export
-```json
-{ "action": "cancel" }
-```
-
-#### Ping / Keepalive
-```json
-{ "type": "ping" }
-```
-Server responds with `{ "type": "pong", "timestamp": "..." }`.
-
----
-
-## ðŸ—„ï¸ Database Schema
-
-### `exports` table
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `VARCHAR(36)` | UUID export identifier (Primary Key) |
-| `status` | `VARCHAR(20)` | `queued` \| `processing` \| `completed` \| `failed` \| `cancelled` |
-| `created_at` | `TIMESTAMP` | Job creation time |
-| `completed_at` | `TIMESTAMP` | Job completion time (nullable) |
-| `file_path` | `TEXT` | Absolute path to generated CSV (nullable) |
-| `file_size` | `BIGINT` | File size in bytes (nullable) |
-| `duration_seconds` | `NUMERIC(10,2)` | Processing duration (nullable) |
-| `error_message` | `TEXT` | Error details on failure (nullable) |
-
-### `users` table
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `SERIAL` | Auto-incrementing user ID (Primary Key) |
-| `name` | `VARCHAR(255)` | User's display name |
-| `email` | `VARCHAR(255)` | Unique email address |
-| `created_at` | `TIMESTAMP` | Account creation timestamp |
-
----
-
-## ðŸ”§ Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | HTTP server listening port |
-| `DATABASE_URL` | `postgres://postgres:postgres@db:5432/exports_db` | PostgreSQL connection string |
-| `REDIS_URL` | `redis://redis:6379` | Redis connection string |
-
----
-
-## ðŸ—ï¸ How It Works â€” Deep Dive
-
-### Export Job Lifecycle
-
-```
-queued â†’ processing â†’ completed
-                    â†˜ failed
-                    â†˜ cancelled
-```
-
-1. **Client** sends `POST /api/exports` â†’ API creates a record in PostgreSQL with status `queued` and enqueues a Bull job.
-2. **Bull Worker** picks up the job, updates the DB to `processing`, and begins reading users in batches of 1,000 rows.
-3. **Progress** is published to a Redis Pub/Sub channel (`export:{exportId}`) at most every 500ms with ETA and percentage.
-4. **WebSocket Server** subscribes to the Redis channel on client connection and forwards all messages to connected browsers.
-5. **On completion**, the CSV file is saved to `/tmp/exports/`, DB is updated to `completed`, and a final WebSocket message with the `downloadUrl` is sent.
-6. **On cancellation**, the client sends `{ action: "cancel" }` via WebSocket. The server sets a Redis flag (`cancel:{exportId}`) that the worker checks before each batch, enabling graceful mid-export cancellation.
-
-### Redis Usage
-
-| Key pattern | Type | Purpose |
-|-------------|------|---------|
-| `bull:csv-exports:*` | Hash/List | Bull job queue internals |
-| `export:{exportId}` | Pub/Sub channel | Real-time progress broadcasting |
-| `cancel:{exportId}` | String (`"1"`) | Cancellation signal flag (TTL: 1 hour) |
-
----
-
-## ðŸ§ª Manual Testing
-
-### Using curl
-
-```bash
-# 1. Start an export
-EXPORT_ID=$(curl -s -X POST http://localhost:8080/api/exports | jq -r '.exportId')
-echo "Export ID: $EXPORT_ID"
-
-# 2. List all exports
-curl -s http://localhost:8080/api/exports | jq
-
-# 3. Download (after completion)
-curl -O -J "http://localhost:8080/api/exports/$EXPORT_ID/download"
-```
-
-### WebSocket Testing (wscat)
-
-```bash
-npx wscat -c ws://localhost:8080/ws/exports/$EXPORT_ID
-
-# Cancel from WebSocket REPL:
-> {"action":"cancel"}
-```
-
----
-
-## ðŸ³ Docker Services
-
-| Service | Image | Port | Role |
-|---------|-------|------|------|
-| `app` | `node:20-alpine` (custom) | `8080` | Node.js API + Worker + WebSocket |
-| `db` | `postgres:16-alpine` | â€” (internal) | Persistent data store |
-| `redis` | `redis:7-alpine` | â€” (internal) | Job queue + Pub/Sub |
-
-All services include health checks. The `app` container waits for both `db` and `redis` to be healthy before starting.
-
----
-
-## ðŸ“„ License
+## License
 
 MIT
