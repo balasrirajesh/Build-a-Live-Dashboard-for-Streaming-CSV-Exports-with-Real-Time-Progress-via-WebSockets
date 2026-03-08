@@ -5,6 +5,7 @@ const path = require('path');
 const { connectRedis } = require('./redis');
 const exportsRouter = require('./routes/exports');
 const { setupWebSocket } = require('./websocket');
+require('./worker'); // starts Bull queue processor
 
 const app = express();
 const server = http.createServer(app);

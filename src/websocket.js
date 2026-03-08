@@ -1,5 +1,6 @@
 ﻿const WebSocket = require('ws');
 const url = require('url');
+const http = require('http');
 const { subscriber } = require('./redis');
 
 const clients = new Map();
@@ -20,10 +21,28 @@ function setupWebSocket(server) {
         const match = url.parse(req.url).pathname.match(/^\/ws\/exports\/([^/]+)$/);
         if (!match) { ws.close(1003, 'Invalid path'); return; }
         const exportId = match[1];
-        const channel  = `export:${exportId}`;
+        const channel = `export:${exportId}`;
         if (!clients.has(exportId)) clients.set(exportId, new Set());
         clients.get(exportId).add(ws);
         if (!subscribedChannels.has(channel)) { subscriber.subscribe(channel); subscribedChannels.add(channel); }
+
+        ws.on('message', (raw) => {
+            try {
+                const msg = JSON.parse(raw);
+                if (msg.action === 'cancel') {
+                    const opts = {
+                        hostname: 'localhost',
+                        port: parseInt(process.env.PORT || '8080', 10),
+                        path: `/api/exports/${exportId}`,
+                        method: 'DELETE',
+                    };
+                    const req2 = http.request(opts);
+                    req2.on('error', (e) => console.error('[ws] cancel request error:', e.message));
+                    req2.end();
+                }
+            } catch (_) { }
+        });
+
         ws.on('close', () => {
             clients.get(exportId)?.delete(ws);
         });
