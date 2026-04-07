@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { format } = require('fast-csv');
 const { exportQueue } = require('./queue');
@@ -19,7 +19,12 @@ async function updateExportStatus(exportId, fields) {
 }
 
 function publish(exportId, payload) {
-    publisher.publish(`export:${exportId}`, JSON.stringify(payload));
+    const finalPayload = {
+        exportId,
+        ...payload,
+        timestamp: new Date().toISOString()
+    };
+    publisher.publish(`export-progress:${exportId}`, JSON.stringify(finalPayload));
 }
 
 exportQueue.process(async (job) => {
@@ -61,7 +66,7 @@ exportQueue.process(async (job) => {
 
         publish(exportId, {
             status: 'processing',
-            progress: { processed, total: TOTAL_USERS, percentage, etaSeconds: etaSeconds ? Math.round(etaSeconds) : null }
+            progress: { processed, total: TOTAL_USERS, percentage, etaSeconds: etaSeconds !== null ? Math.round(etaSeconds) : null }
         });
     }
 
@@ -93,6 +98,13 @@ exportQueue.process(async (job) => {
 
 exportQueue.on('failed', async (job, err) => {
     const { exportId } = job.data;
+    if (err.message === 'Cancelled by user') {
+        try {
+            await updateExportStatus(exportId, { status: 'cancelled' });
+            publish(exportId, { status: 'cancelled' });
+        } catch (_) {}
+        return;
+    }
     console.error(`[worker] Job ${job.id} failed:`, err.message);
     try {
         await updateExportStatus(exportId, { status: 'failed' });

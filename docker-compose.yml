@@ -2,51 +2,49 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:13
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: exports_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydatabase
     volumes:
       - ./seeds:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d exports_db"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U user -d mydatabase"]
+      interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: redis:6-alpine
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     ports:
       - "8080:8080"
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/exports_db
-      REDIS_URL: redis://redis:6379
-      PORT: 8080
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/mydatabase
+      REDIS_URL: redis://redis:6379
+      PORT: 8080
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 15s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   pgdata:

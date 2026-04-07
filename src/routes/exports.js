@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
@@ -19,7 +19,7 @@ router.post('/', async (req, res) => {
 // GET /api/exports  — list recent exports
 router.get('/', async (req, res) => {
     const result = await db.query(
-        'SELECT id AS "exportId", status, created_at AS "createdAt", completed_at AS "completedAt" FROM exports ORDER BY created_at DESC LIMIT 50'
+        'SELECT id AS "exportId", status, created_at AS "createdAt", completed_at AS "completedAt" FROM exports ORDER BY created_at DESC LIMIT 20'
     );
     res.status(200).json({ exports: result.rows });
 });
